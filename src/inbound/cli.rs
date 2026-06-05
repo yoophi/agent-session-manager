@@ -8,8 +8,11 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use tracing_subscriber::{EnvFilter, fmt};
 
-use crate::application::services::ListSessionsService;
-use crate::domain::{AgentKind, AgentSession, ListSessionsQuery, SessionScope};
+use crate::application::services::{ListSessionsService, RemoveSessionService};
+use crate::domain::{
+    AgentKind, AgentSession, ListSessionsQuery, RemoveSessionCommand, RemoveSessionResult,
+    SessionScope,
+};
 use crate::outbound::filesystem::FilesystemSessionRepository;
 
 #[derive(Debug, Parser)]
@@ -38,6 +41,20 @@ enum Commands {
         /// Output format.
         #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
         output: OutputFormat,
+    },
+    /// Remove an agent session transcript.
+    Rm {
+        /// Agent session source.
+        #[arg(long, value_enum)]
+        agent: AgentArg,
+
+        /// Exact session id to remove.
+        #[arg(long)]
+        session_id: String,
+
+        /// Show the target without moving it to trash.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -99,6 +116,19 @@ pub fn run(cli: Cli) -> Result<()> {
             };
             print_sessions(&sessions, output)?;
         }
+        Commands::Rm {
+            agent,
+            session_id,
+            dry_run,
+        } => {
+            let service = RemoveSessionService::new(FilesystemSessionRepository::default());
+            let result = service.execute(RemoveSessionCommand {
+                agent: agent.into(),
+                session_id,
+                dry_run,
+            })?;
+            print_remove_result(&result)?;
+        }
     }
 
     Ok(())
@@ -125,6 +155,26 @@ fn print_sessions(sessions: &[AgentSession], output: OutputFormat) -> Result<()>
         OutputFormat::Csv => print_csv_sessions(sessions),
         OutputFormat::Json => print_json_sessions(sessions),
     }
+}
+
+fn print_remove_result(result: &RemoveSessionResult) -> Result<()> {
+    let status = if result.dry_run {
+        "would remove"
+    } else {
+        "removed"
+    };
+    let stdout = io::stdout();
+    let mut writer = stdout.lock();
+    write_line(
+        &mut writer,
+        &format!(
+            "{} session: agent={} session_id={} file={}",
+            status,
+            result.agent,
+            result.session_id,
+            result.file.display()
+        ),
+    )
 }
 
 fn print_text_sessions(sessions: &[AgentSession]) -> Result<()> {

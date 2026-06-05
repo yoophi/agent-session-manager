@@ -72,3 +72,30 @@ fn lists_sessions_as_csv() {
             "agent,session_id,title,cwd,file_path,message_count",
         ));
 }
+
+#[test]
+fn prints_rm_help() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args(["rm", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--session-id"));
+}
+
+#[test]
+fn rm_missing_session_fails_without_deleting() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args([
+        "rm",
+        "--agent",
+        "pi",
+        "--session-id",
+        "missing-session-id-for-test",
+        "--dry-run",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("session not found"));
+}

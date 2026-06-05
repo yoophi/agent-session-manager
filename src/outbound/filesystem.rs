@@ -32,6 +32,11 @@ impl SessionRepository for FilesystemSessionRepository {
             AgentKind::Pi => scan_agent(agent, self.pi_root()?, scope, parse_pi),
         }
     }
+
+    fn move_to_trash(&self, path: &Path) -> Result<()> {
+        trash::delete(path)?;
+        Ok(())
+    }
 }
 
 impl FilesystemSessionRepository {

@@ -71,6 +71,21 @@ pub struct ListSessionsQuery {
     pub scope: SessionScope,
 }
 
+#[derive(Clone, Debug)]
+pub struct RemoveSessionCommand {
+    pub agent: AgentKind,
+    pub session_id: String,
+    pub dry_run: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct RemoveSessionResult {
+    pub agent: AgentKind,
+    pub session_id: String,
+    pub file: PathBuf,
+    pub dry_run: bool,
+}
+
 pub fn home_dir() -> anyhow::Result<PathBuf> {
     std::env::var_os("HOME")
         .map(PathBuf::from)

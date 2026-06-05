@@ -18,11 +18,17 @@ cargo run -- list --path /path/to/project
 cargo run -- list --agent pi --path /path/to/project
 cargo run -- list --agent claude --output json
 cargo run -- list --agent codex --output csv
+cargo run -- rm --agent claude --session-id <session-id> --dry-run
+cargo run -- rm --agent claude --session-id <session-id>
 ```
 
 `--all` means all agents and is the default when `--agent` is omitted.
 `--all` cannot be used with `--agent`.
 `--output` supports `text`, `csv`, and `json`; `text` is the default.
+
+`rm` requires an exact `--session-id` and one `--agent`. It moves the matching
+transcript file to the system trash. Related directories such as Claude
+subagent/tool-result folders are not removed in the first implementation.
 
 ## Architecture
 
