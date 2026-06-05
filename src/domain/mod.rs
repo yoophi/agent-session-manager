@@ -14,6 +14,10 @@ pub enum AgentKind {
     Pi,
 }
 
+impl AgentKind {
+    pub const ALL: [Self; 3] = [Self::Claude, Self::Codex, Self::Pi];
+}
+
 impl fmt::Display for AgentKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {

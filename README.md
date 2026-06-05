@@ -11,14 +11,17 @@ Supported agents:
 ## Usage
 
 ```sh
+cargo run -- list
+cargo run -- list --all
 cargo run -- list --agent claude
-cargo run -- list --agent codex --all
+cargo run -- list --path /path/to/project
 cargo run -- list --agent pi --path /path/to/project
 cargo run -- list --agent claude --output json
 cargo run -- list --agent codex --output csv
 ```
 
-`--all` is the default when `--path` is not provided.
+`--all` means all agents and is the default when `--agent` is omitted.
+`--all` cannot be used with `--agent`.
 `--output` supports `text`, `csv`, and `json`; `text` is the default.
 
 ## Architecture

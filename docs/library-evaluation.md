@@ -5,9 +5,11 @@
 목표 CLI는 다음 형태를 지원해야 한다.
 
 ```sh
+agent-sessions list
+agent-sessions list --all
 agent-sessions list --agent { claude | codex | pi }
 agent-sessions list --agent { claude | codex | pi } --path <path>
-agent-sessions list --agent { claude | codex | pi } --all
+agent-sessions list --path <path>
 ```
 
 라이브러리 요구사항:

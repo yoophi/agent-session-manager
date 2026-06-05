@@ -25,14 +25,14 @@ enum Commands {
     List {
         /// Agent session source.
         #[arg(long, value_enum)]
-        agent: AgentArg,
+        agent: Option<AgentArg>,
 
         /// Show sessions for this working directory only.
-        #[arg(long, conflicts_with = "all")]
+        #[arg(long)]
         path: Option<PathBuf>,
 
-        /// Show all sessions. This is the default.
-        #[arg(long, default_value_t = true)]
+        /// Show sessions for all agents. This is the default when --agent is omitted.
+        #[arg(long, conflicts_with = "agent")]
         all: bool,
 
         /// Output format.
@@ -89,17 +89,34 @@ pub fn run(cli: Cli) -> Result<()> {
                 Some(path) => SessionScope::Path(path.canonicalize().unwrap_or(path)),
                 None => SessionScope::All,
             };
-            let query = ListSessionsQuery {
-                agent: agent.into(),
-                scope,
-            };
             let service = ListSessionsService::new(FilesystemSessionRepository::default());
-            let sessions = service.execute(query)?;
+            let sessions = match agent {
+                Some(agent) => service.execute(ListSessionsQuery {
+                    agent: agent.into(),
+                    scope,
+                })?,
+                None => list_all_agents(&service, scope)?,
+            };
             print_sessions(&sessions, output)?;
         }
     }
 
     Ok(())
+}
+
+fn list_all_agents(
+    service: &ListSessionsService<FilesystemSessionRepository>,
+    scope: SessionScope,
+) -> Result<Vec<AgentSession>> {
+    let mut sessions = Vec::new();
+    for agent in AgentKind::ALL {
+        sessions.extend(service.execute(ListSessionsQuery {
+            agent,
+            scope: scope.clone(),
+        })?);
+    }
+    sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+    Ok(sessions)
 }
 
 fn print_sessions(sessions: &[AgentSession], output: OutputFormat) -> Result<()> {

@@ -22,13 +22,33 @@ fn lists_claude_sessions_by_default_all_scope() {
 }
 
 #[test]
-fn rejects_path_and_all_together() {
+fn lists_all_agents_by_default() {
     let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
 
-    cmd.args(["list", "--agent", "pi", "--all", "--path", "."])
+    cmd.arg("list")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("AGENT\tSESSION_ID\tMESSAGES"));
+}
+
+#[test]
+fn rejects_agent_and_all_together() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args(["list", "--agent", "pi", "--all"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
+fn allows_all_agents_for_path() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args(["list", "--all", "--path", "."])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("AGENT\tSESSION_ID\tMESSAGES"));
 }
 
 #[test]

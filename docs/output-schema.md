@@ -7,12 +7,14 @@
 지원할 출력 옵션:
 
 ```sh
+agent-sessions list --all --output text
 agent-sessions list --agent claude --output text
 agent-sessions list --agent codex --output csv
 agent-sessions list --agent pi --output json
 ```
 
 `--output` 기본값은 `text`다.
+`--all`은 모든 agent 세션 조회를 의미하며, `--agent`가 없을 때 기본 동작이다. `--all`과 `--agent`는 함께 사용할 수 없다.
 
 ## 공통 schema
 
