@@ -2,8 +2,10 @@ use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use walkdir::WalkDir;
 
@@ -123,13 +125,41 @@ fn parse_claude(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
     let mut cwd = None;
     let mut title = None;
     let mut message_count = 0;
+    let mut created_at = None;
+    let mut updated_at = None;
+    let mut model = None;
+    let mut branch = None;
+    let mut source = None;
 
     for value in read_json_lines(path, 200)? {
         if let Some(session_id) = value.get("sessionId").and_then(Value::as_str) {
             id = session_id.to_string();
         }
+        if let Some(timestamp) = value.get("timestamp").and_then(Value::as_str) {
+            apply_timestamp(&mut created_at, &mut updated_at, timestamp);
+        }
         if cwd.is_none() {
             cwd = value.get("cwd").and_then(Value::as_str).map(PathBuf::from);
+        }
+        if model.is_none() {
+            model = value
+                .get("message")
+                .and_then(|message| message.get("model"))
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned);
+        }
+        if branch.is_none() {
+            branch = value
+                .get("gitBranch")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned);
+        }
+        if source.is_none() {
+            source = value
+                .get("entrypoint")
+                .or_else(|| value.get("promptSource"))
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned);
         }
         if value.get("type").and_then(Value::as_str) == Some("user") {
             message_count += 1;
@@ -148,7 +178,13 @@ fn parse_claude(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
         title,
         file: path.to_path_buf(),
         message_count,
-        modified_at: metadata.modified().ok(),
+        created_at: created_at.or_else(|| metadata.created().ok()),
+        updated_at: updated_at.or_else(|| metadata.modified().ok()),
+        model,
+        branch,
+        source,
+        is_subsession: false,
+        parent_session_id: None,
     }))
 }
 
@@ -161,8 +197,17 @@ fn parse_codex(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
     let mut cwd = None;
     let mut title = None;
     let mut message_count = 0;
+    let mut created_at = None;
+    let mut updated_at = None;
+    let mut model = None;
+    let mut branch = None;
+    let mut source = None;
 
     for value in read_json_lines(path, 200)? {
+        if let Some(timestamp) = value.get("timestamp").and_then(Value::as_str) {
+            apply_timestamp(&mut created_at, &mut updated_at, timestamp);
+        }
+
         if value.get("type").and_then(Value::as_str) == Some("session_meta")
             && let Some(payload) = value.get("payload")
         {
@@ -173,6 +218,18 @@ fn parse_codex(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
                 .get("cwd")
                 .and_then(Value::as_str)
                 .map(PathBuf::from);
+            source = payload
+                .get("source")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned);
+            branch = payload
+                .get("git")
+                .and_then(|git| git.get("branch"))
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned);
+            if let Some(timestamp) = payload.get("timestamp").and_then(Value::as_str) {
+                apply_timestamp(&mut created_at, &mut updated_at, timestamp);
+            }
         }
 
         if value.get("type").and_then(Value::as_str) == Some("response_item") {
@@ -181,6 +238,9 @@ fn parse_codex(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
             };
             if payload.get("type").and_then(Value::as_str) == Some("message") {
                 message_count += 1;
+                if let Some(payload_model) = payload.get("model").and_then(Value::as_str) {
+                    model = Some(payload_model.to_string());
+                }
                 if title.is_none() && payload.get("role").and_then(Value::as_str) == Some("user") {
                     title = extract_codex_user_text(payload);
                 }
@@ -195,7 +255,13 @@ fn parse_codex(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
         title,
         file: path.to_path_buf(),
         message_count,
-        modified_at: metadata.modified().ok(),
+        created_at: created_at.or_else(|| metadata.created().ok()),
+        updated_at: updated_at.or_else(|| metadata.modified().ok()),
+        model,
+        branch,
+        source,
+        is_subsession: false,
+        parent_session_id: None,
     }))
 }
 
@@ -208,17 +274,42 @@ fn parse_pi(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
     let mut cwd = None;
     let mut title = None;
     let mut message_count = 0;
+    let mut created_at = None;
+    let mut updated_at = None;
+    let mut model = None;
+    let branch = None;
+    let source = None;
 
     for value in read_json_lines(path, 200)? {
+        if let Some(timestamp) = value.get("timestamp").and_then(Value::as_str) {
+            apply_timestamp(&mut created_at, &mut updated_at, timestamp);
+        }
+
         match value.get("type").and_then(Value::as_str) {
             Some("session") => {
                 if let Some(header_id) = value.get("id").and_then(Value::as_str) {
                     id = header_id.to_string();
                 }
                 cwd = value.get("cwd").and_then(Value::as_str).map(PathBuf::from);
+                if let Some(timestamp) = value.get("timestamp").and_then(Value::as_str) {
+                    apply_timestamp(&mut created_at, &mut updated_at, timestamp);
+                }
+            }
+            Some("model_change") => {
+                model = value
+                    .get("modelId")
+                    .and_then(Value::as_str)
+                    .map(ToOwned::to_owned);
             }
             Some("message") => {
                 message_count += 1;
+                if let Some(message_model) = value
+                    .get("message")
+                    .and_then(|message| message.get("model"))
+                    .and_then(Value::as_str)
+                {
+                    model = Some(message_model.to_string());
+                }
                 if title.is_none() {
                     title = extract_pi_user_text(&value);
                 }
@@ -239,8 +330,37 @@ fn parse_pi(agent: AgentKind, path: &Path) -> Result<Option<AgentSession>> {
         title,
         file: path.to_path_buf(),
         message_count,
-        modified_at: metadata.modified().ok(),
+        created_at: created_at.or_else(|| metadata.created().ok()),
+        updated_at: updated_at.or_else(|| metadata.modified().ok()),
+        model,
+        branch,
+        source,
+        is_subsession: false,
+        parent_session_id: None,
     }))
+}
+
+fn apply_timestamp(
+    created_at: &mut Option<SystemTime>,
+    updated_at: &mut Option<SystemTime>,
+    value: &str,
+) {
+    let Some(parsed) = parse_timestamp(value) else {
+        return;
+    };
+
+    if created_at.is_none_or(|current| parsed < current) {
+        *created_at = Some(parsed);
+    }
+    if updated_at.is_none_or(|current| parsed > current) {
+        *updated_at = Some(parsed);
+    }
+}
+
+fn parse_timestamp(value: &str) -> Option<SystemTime> {
+    DateTime::parse_from_rfc3339(value)
+        .map(|value| value.with_timezone(&Utc).into())
+        .ok()
 }
 
 fn read_json_lines(path: &Path, max_lines: usize) -> Result<Vec<Value>> {

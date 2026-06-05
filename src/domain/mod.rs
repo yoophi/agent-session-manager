@@ -4,8 +4,10 @@ use std::str::FromStr;
 use std::time::SystemTime;
 
 use anyhow::{anyhow, bail};
+use serde::Serialize;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum AgentKind {
     Claude,
     Codex,
@@ -44,7 +46,13 @@ pub struct AgentSession {
     pub title: Option<String>,
     pub file: PathBuf,
     pub message_count: usize,
-    pub modified_at: Option<SystemTime>,
+    pub created_at: Option<SystemTime>,
+    pub updated_at: Option<SystemTime>,
+    pub model: Option<String>,
+    pub branch: Option<String>,
+    pub source: Option<String>,
+    pub is_subsession: bool,
+    pub parent_session_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]

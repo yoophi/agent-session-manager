@@ -17,7 +17,7 @@ where
 
     pub fn execute(&self, query: ListSessionsQuery) -> Result<Vec<AgentSession>> {
         let mut sessions = self.repository.list(query.agent, &query.scope)?;
-        sessions.sort_by(|left, right| right.modified_at.cmp(&left.modified_at));
+        sessions.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
         Ok(sessions)
     }
 }

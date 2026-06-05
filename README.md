@@ -14,9 +14,12 @@ Supported agents:
 cargo run -- list --agent claude
 cargo run -- list --agent codex --all
 cargo run -- list --agent pi --path /path/to/project
+cargo run -- list --agent claude --output json
+cargo run -- list --agent codex --output csv
 ```
 
 `--all` is the default when `--path` is not provided.
+`--output` supports `text`, `csv`, and `json`; `text` is the default.
 
 ## Architecture
 
