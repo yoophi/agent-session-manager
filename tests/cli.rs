@@ -32,6 +32,25 @@ fn lists_all_agents_by_default() {
 }
 
 #[test]
+fn lists_all_agents_when_command_is_omitted() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("AGENT\tSESSION_ID\tMESSAGES"));
+}
+
+#[test]
+fn accepts_list_options_when_command_is_omitted() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args(["--agent", "codex", "--output", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"sessions\""));
+}
+
+#[test]
 fn rejects_agent_and_all_together() {
     let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
 

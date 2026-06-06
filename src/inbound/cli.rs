@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::time::SystemTime;
-use std::{io, io::Write};
+use std::{env, io, io::Write};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -18,30 +18,17 @@ use crate::outbound::filesystem::FilesystemSessionRepository;
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
 pub struct Cli {
+    #[command(flatten)]
+    list: ListArgs,
+
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// List agent sessions.
-    List {
-        /// Agent session source.
-        #[arg(long, value_enum)]
-        agent: Option<AgentArg>,
-
-        /// Show sessions for this working directory only.
-        #[arg(long)]
-        path: Option<PathBuf>,
-
-        /// Show sessions for all agents. This is the default when --agent is omitted.
-        #[arg(long, conflicts_with = "agent")]
-        all: bool,
-
-        /// Output format.
-        #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
-        output: OutputFormat,
-    },
+    List(ListArgs),
     /// Remove an agent session transcript.
     Rm {
         /// Agent session source.
@@ -56,6 +43,25 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+}
+
+#[derive(Debug, Parser)]
+struct ListArgs {
+    /// Agent session source.
+    #[arg(long, value_enum)]
+    agent: Option<AgentArg>,
+
+    /// Show sessions for this path. Defaults to the current working directory.
+    #[arg(long)]
+    path: Option<PathBuf>,
+
+    /// Show sessions for all agents. This is the default when --agent is omitted.
+    #[arg(long, conflicts_with = "agent")]
+    all: bool,
+
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
+    output: OutputFormat,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -96,31 +102,12 @@ pub fn init_tracing() {
 
 pub fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Commands::List {
-            agent,
-            path,
-            output,
-            ..
-        } => {
-            let scope = match path {
-                Some(path) => SessionScope::Path(path.canonicalize().unwrap_or(path)),
-                None => SessionScope::All,
-            };
-            let service = ListSessionsService::new(FilesystemSessionRepository::default());
-            let sessions = match agent {
-                Some(agent) => service.execute(ListSessionsQuery {
-                    agent: agent.into(),
-                    scope,
-                })?,
-                None => list_all_agents(&service, scope)?,
-            };
-            print_sessions(&sessions, output)?;
-        }
-        Commands::Rm {
+        Some(Commands::List(args)) => run_list(args)?,
+        Some(Commands::Rm {
             agent,
             session_id,
             dry_run,
-        } => {
+        }) => {
             let service = RemoveSessionService::new(FilesystemSessionRepository::default());
             let result = service.execute(RemoveSessionCommand {
                 agent: agent.into(),
@@ -129,9 +116,31 @@ pub fn run(cli: Cli) -> Result<()> {
             })?;
             print_remove_result(&result)?;
         }
+        None => run_list(cli.list)?,
     }
 
     Ok(())
+}
+
+fn run_list(args: ListArgs) -> Result<()> {
+    let scope = SessionScope::Path(resolve_scope_path(args.path)?);
+    let service = ListSessionsService::new(FilesystemSessionRepository::default());
+    let sessions = match args.agent {
+        Some(agent) => service.execute(ListSessionsQuery {
+            agent: agent.into(),
+            scope,
+        })?,
+        None => list_all_agents(&service, scope)?,
+    };
+    print_sessions(&sessions, args.output)
+}
+
+fn resolve_scope_path(path: Option<PathBuf>) -> Result<PathBuf> {
+    let path = match path {
+        Some(path) => path,
+        None => env::current_dir()?,
+    };
+    Ok(path.canonicalize().unwrap_or(path))
 }
 
 fn list_all_agents(
@@ -196,7 +205,24 @@ fn print_text_sessions(sessions: &[AgentSession]) -> Result<()> {
 fn print_csv_sessions(sessions: &[AgentSession]) -> Result<()> {
     let mut bytes = Vec::new();
     {
-        let mut writer = csv::Writer::from_writer(&mut bytes);
+        let mut writer = csv::WriterBuilder::new()
+            .has_headers(false)
+            .from_writer(&mut bytes);
+        writer.write_record([
+            "agent",
+            "session_id",
+            "title",
+            "cwd",
+            "file_path",
+            "message_count",
+            "created_at",
+            "updated_at",
+            "model",
+            "branch",
+            "source",
+            "is_subsession",
+            "parent_session_id",
+        ])?;
         for session in sessions {
             writer.serialize(SessionOutput::from(session))?;
         }

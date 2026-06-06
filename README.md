@@ -20,6 +20,9 @@ Make sure `~/.local/bin` is included in your `$PATH`.
 ## Usage
 
 ```sh
+cargo run --
+cargo run -- --agent claude
+cargo run -- --output json
 cargo run -- list
 cargo run -- list --all
 cargo run -- list --agent claude
@@ -31,6 +34,9 @@ cargo run -- rm --agent claude --session-id <session-id> --dry-run
 cargo run -- rm --agent claude --session-id <session-id>
 ```
 
+Running without a command defaults to `list`.
+When `--path` is omitted, the current working directory is used as if
+`--path .` had been passed.
 `--all` means all agents and is the default when `--agent` is omitted.
 `--all` cannot be used with `--agent`.
 `--output` supports `text`, `csv`, and `json`; `text` is the default.
