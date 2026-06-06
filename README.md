@@ -8,6 +8,15 @@ Supported agents:
 - OpenAI Codex CLI
 - Pi Coding Agent
 
+## Installation
+
+```sh
+cargo install --path . --bin agent-sessions --root ~/.local
+```
+
+This installs the `agent-sessions` binary to `~/.local/bin`.
+Make sure `~/.local/bin` is included in your `$PATH`.
+
 ## Usage
 
 ```sh
