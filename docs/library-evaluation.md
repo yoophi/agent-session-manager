@@ -6,7 +6,8 @@
 
 ```sh
 agent-sessions list
-agent-sessions list --all
+agent-sessions list --all-agents
+agent-sessions list --all-paths
 agent-sessions list --agent { claude | codex | pi }
 agent-sessions list --agent { claude | codex | pi } --path <path>
 agent-sessions list --path <path>

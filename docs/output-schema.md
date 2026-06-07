@@ -7,14 +7,16 @@
 지원할 출력 옵션:
 
 ```sh
-agent-sessions list --all --output text
+agent-sessions list --all-agents --output text
+agent-sessions list --all-paths --output text
 agent-sessions list --agent claude --output text
 agent-sessions list --agent codex --output csv
 agent-sessions list --agent pi --output json
 ```
 
 `--output` 기본값은 `text`다.
-`--all`은 모든 agent 세션 조회를 의미하며, `--agent`가 없을 때 기본 동작이다. `--all`과 `--agent`는 함께 사용할 수 없다.
+`--all-agents`는 모든 agent 세션 조회를 의미하며, `--agent`가 없을 때 기본 동작이다. `--all-agents`와 `--agent`는 함께 사용할 수 없다.
+`--all-paths`는 현재 디렉터리 기준 필터를 해제하고 모든 디렉터리의 세션을 조회한다.
 
 ## 공통 schema
 

@@ -51,10 +51,10 @@ fn accepts_list_options_when_command_is_omitted() {
 }
 
 #[test]
-fn rejects_agent_and_all_together() {
+fn rejects_agent_and_all_agents_together() {
     let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
 
-    cmd.args(["list", "--agent", "pi", "--all"])
+    cmd.args(["list", "--agent", "pi", "--all-agents"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));
@@ -64,10 +64,40 @@ fn rejects_agent_and_all_together() {
 fn allows_all_agents_for_path() {
     let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
 
-    cmd.args(["list", "--all", "--path", "."])
+    cmd.args(["list", "--all-agents", "--path", "."])
         .assert()
         .success()
         .stdout(predicate::str::contains("AGENT\tSESSION_ID\tMESSAGES"));
+}
+
+#[test]
+fn allows_all_paths() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args(["list", "--agent", "codex", "--all-paths"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("AGENT\tSESSION_ID\tMESSAGES"));
+}
+
+#[test]
+fn rejects_path_and_all_paths_together() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args(["list", "--path", ".", "--all-paths"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot be used with"));
+}
+
+#[test]
+fn rejects_removed_all_option() {
+    let mut cmd = Command::cargo_bin("agent-sessions").unwrap();
+
+    cmd.args(["list", "--all"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unexpected argument"));
 }
 
 #[test]

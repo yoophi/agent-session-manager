@@ -52,12 +52,16 @@ struct ListArgs {
     agent: Option<AgentArg>,
 
     /// Show sessions for this path. Defaults to the current working directory.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "all_paths")]
     path: Option<PathBuf>,
 
     /// Show sessions for all agents. This is the default when --agent is omitted.
     #[arg(long, conflicts_with = "agent")]
-    all: bool,
+    all_agents: bool,
+
+    /// Show sessions across all directories instead of only the current path.
+    #[arg(long)]
+    all_paths: bool,
 
     /// Output format.
     #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
@@ -123,7 +127,7 @@ pub fn run(cli: Cli) -> Result<()> {
 }
 
 fn run_list(args: ListArgs) -> Result<()> {
-    let scope = SessionScope::Path(resolve_scope_path(args.path)?);
+    let scope = resolve_scope(args.path, args.all_paths)?;
     let service = ListSessionsService::new(FilesystemSessionRepository::default());
     let sessions = match args.agent {
         Some(agent) => service.execute(ListSessionsQuery {
@@ -133,6 +137,14 @@ fn run_list(args: ListArgs) -> Result<()> {
         None => list_all_agents(&service, scope)?,
     };
     print_sessions(&sessions, args.output)
+}
+
+fn resolve_scope(path: Option<PathBuf>, all_paths: bool) -> Result<SessionScope> {
+    if all_paths {
+        return Ok(SessionScope::All);
+    }
+
+    Ok(SessionScope::Path(resolve_scope_path(path)?))
 }
 
 fn resolve_scope_path(path: Option<PathBuf>) -> Result<PathBuf> {
